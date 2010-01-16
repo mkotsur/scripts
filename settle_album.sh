@@ -2,24 +2,36 @@
 #Script to extract downloaded archives whit music
 #
 
-# bash --version
-
+# variable keeps steps to be done in case of fail (kinda transaction state)
 declare -a steps
 
 function addRevertStep {
     steps[${#steps[@]}]="$1"
 }
 
+
 function printRevertSteps {
-    cmd_count=${#steps[@]}-1
-    echo "Commands to revert ($cmd_count}):"
-    while [ $cmd_count -ge 0 ]; do
-        echo item: "$steps[$cmd_count]" 
-        let cmd_count=cmd_count-1
-    done
-    
-    for step in ${!steps[*]}; do
-        echo item: "$steps[step]" 
+    cmd_count=${#steps[@]}
+
+    message "Commands to revert "$cmd_count
+
+    cmd_index=$cmd_count
+    let "cmd_index = cmd_count - 1"
+    while [ $cmd_index -ge 0 ]
+        do
+        cmd=${steps[$cmd_index]}
+        echo "Command $cmd_index of $cmd_count: " $cmd
+
+        a=`$cmd`
+        if $a
+            then
+                message "EXECUTED"
+            else
+                fail 1
+        fi
+
+        let "cmd_index = cmd_index - 1"
+
     done
 }
 
@@ -35,6 +47,18 @@ function debug {
     echo " o_O Debug: "$1
 }
 
+function success {
+    message "SUCEEDED TO UNPACK ARCHIVE"
+    printRevertSteps
+    exit 0
+}
+
+function fail  {
+    error "FAILED TO UNPACK ARCHIVE"
+    printRevertSteps
+    exit $1
+}
+
 function validate {
 
 #debug "Validation 0:\"$0\", 1:\"$1\", 2:\"$2\", 3:\"$3\", 4:\"$4\", 5:\"$5\""
@@ -47,46 +71,49 @@ function validate {
 
     if [ ! -f "$4" ]
         then
-          error "Archive  $4 does not exists."
+          error "Archive $4 does not exists."
           exit 1
     fi
-
+    if [[ ! "$4" =~ ^.*\.(zip|rar) ]]
+        then
+            error "Unsupported type of archive."
+            fail 1
+    fi
     if [ "$1" == "" ]
-        then 
+        then
             error "Band name missing."
-            exit 1
+            fail 1
     fi
 
     if [ "$2" == "" ]
-        then 
-            error "Error: Album name missing."
-            exit 1
+        then
+            error "Album name missing."
+            fail 1
     fi
 }
 
 function create_dir {
-    
+
     debug "create_dir param: $1"
-    
-    if [ -d "$1" ] 
+
+    if [ -d "$1" ]
         then
-            message "Directory $1 already exists." 
+            message "Directory $1 already exists."
         else
             message "Creating $1 "
-            mkdir "$1"
-            if [ $? = 0 ]
+
+            if mkdir "$1" &> /dev/null
                 then
-                    message "Created $1" 
-                    addRevertStep "rm -rf $1"
+                    message "Created $1"
+                    addRevertStep "rm -rf \"$1\""
                 else
                     error "Can not create $1"
-                    exit $?
-            fi             
+                    fail 1
+            fi
     fi
 }
 
 function prepare_path {
-    #echo $1 | sed 's/\ /\\ /g'
     echo $1
 }
 
@@ -97,28 +124,28 @@ target_path="/home/$USER/Music"
 
 
 while getopts "b:a:y:" optname
-do 
+do
     case "$optname" in
-        b) 
-            band=$OPTARG 
+        b)
+            band=$OPTARG
             ;;
-        a) 
-            album=$OPTARG 
+        a)
+            album=$OPTARG
             ;;
-        y) 
-            year=$OPTARG 
+        y)
+            year=$OPTARG
             ;;
         [?])
             echo "Invalid option "$optname"\n"
-            exit 1
+            fail 1
     esac
 done
 
 shift $(($OPTIND - 1))
 
-archive=${!#} 
+archive=${!#}
 
-echo "Band:\"$band\", album:\"$album\", year:\"$year\", archive:\"$archive\""
+debug "Band:\"$band\", album:\"$album\", year:\"$year\", archive:\"$archive\""
 
 # Input validation
 validate "$band" "$album" "$year" "$archive" ${#}
@@ -141,27 +168,19 @@ create_dir "$album_path"
 
 case "$archive" in
     *.rar)
-        message "Extracting RAR archive"
+        message "Extracting RAR archive..."
         unrar e -ep "$archive" "$album_path";
     ;;
     *.zip)
-        message "Extracting ZIP archive"
+        message "Extracting ZIP archive..."
         unzip -j "$archive" -d "$album_path";
     ;;
     *)
         error "Unsupported extension..."
-        exit 1
+        fail 1
     ;;
 esac
 
-if [ $? = 0 ]
-    then
-        message "Successful extracting :-)";
-    else
-        error "Error while extracting archive :-(";
-fi
-
-printRevertSteps
-
-exit 0
+# Handle unpacking result
+if [ $? = 0 ] ; then success; else fail 1; fi
 
