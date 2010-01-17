@@ -20,14 +20,15 @@ function printRevertSteps {
     while [ $cmd_index -ge 0 ]
         do
         cmd=${steps[$cmd_index]}
-        echo "Command $cmd_index of $cmd_count: " $cmd
+        echo " ** Command $cmd_index of $cmd_count: " $cmd
+                   
 
-        a=`$cmd`
-        if $a
+        if eval $cmd &> /dev/null
             then
                 message "EXECUTED"
             else
-                fail 1
+                error "Could not execute reverting command..."
+                error "You must do it manually"
         fi
 
         let "cmd_index = cmd_index - 1"
