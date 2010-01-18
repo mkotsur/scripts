@@ -1,5 +1,5 @@
 #!/bin/bash
-#Script to extract downloaded archives whit music
+#Script to extract downloaded archives with music
 #
 
 # variable keeps steps to be done in case of fail (kinda transaction state)
