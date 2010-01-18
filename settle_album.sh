@@ -5,12 +5,16 @@
 # variable keeps steps to be done in case of fail (kinda transaction state)
 declare -a steps
 
+# Where to put unpacked stuff
+target_path="/home/$USER/Music"
+
+# Stores action for performing in case of rollback
 function addRevertStep {
     steps[${#steps[@]}]="$1"
 }
 
-
-function printRevertSteps {
+# Proceed rollback
+function doRevertSteps {
     cmd_count=${#steps[@]}
 
     message "Commands to revert "$cmd_count
@@ -45,54 +49,60 @@ function message {
 }
 
 function debug {
-    echo " o_O Debug: "$1
+    if [[ $verbose -eq 1 ]]; then echo " (>|<) "$1; fi
 }
 
 function success {
+    rm -f "$archive"
     message "SUCEEDED TO UNPACK ARCHIVE"
-    printRevertSteps
     exit 0
 }
 
 function fail  {
     error "FAILED TO UNPACK ARCHIVE"
-    printRevertSteps
+    doRevertSteps
     exit $1
 }
 
-function validate {
+function help {
 
-#debug "Validation 0:\"$0\", 1:\"$1\", 2:\"$2\", 3:\"$3\", 4:\"$4\", 5:\"$5\""
+    echo "Script for extracting music from archives..."
+    echo " -- Options --"
+    echo "-b [required] Band name"
+    echo "-a [required] Album name"
+    echo "-y [optional] release Year"
+    echo ""
+    echo " -- Keys --"
+    echo "-v [optional] Verbose"
+    echo ""
+    echo " -- Usage --"
+    echo "./settle_album.sh -b \"Band name\" -a \"Album name\" -y YYYY ~/Downloads/music_archive.rar"
+    echo ""
+    echo "Currently supported types: zip, rar, 7z. Files will be extracted to $target_path/Band name/YYYY - Album name/*;"
+    echo "Directory structure inside archive will be suppressed."
+    echo "Script provided as is. Author: Mykhailo Kotsur. http://sotomajor.org.ua"
+    echo "You are welcome to suggest or contribute: http://github.com/mkotsur/scripts"
+    exit 0
 
-    if [ "$5"  = "0" ]
-        then
-          error "What to unpack?"
-          exit 1
-    fi
-
-    if [ ! -f "$4" ]
-        then
-          error "Archive $4 does not exists."
-          exit 1
-    fi
-    if [[ ! "$4" =~ ^.*\.(zip|rar) ]]
-        then
-            error "Unsupported type of archive."
-            fail 1
-    fi
-    if [ "$1" == "" ]
-        then
-            error "Band name missing."
-            fail 1
-    fi
-
-    if [ "$2" == "" ]
-        then
-            error "Album name missing."
-            fail 1
-    fi
 }
 
+# Validates input
+function validate {
+
+    if [ ! -d "$target_path" ]; then error "Path \"$target_path\" does not exist"; error "Create it first"; fail 1; fi
+
+    if [ "$5"  = "0" ]; then error "What to unpack?"; error "Last argument should be path to archive."; fail 1; fi
+
+    if [ ! -f "$4" ]; then error "Archive $4 does not exists."; fail 1; fi
+
+    if [[ ! "$4" =~ ^.*\.(zip|rar|7z) ]]; then error "Unsupported type of archive."; fail 1; fi
+
+    if [ "$1" == "" ]; then error "Band name missing."; fail 1; fi
+
+    if [ "$2" == "" ]; then error "Album name missing."; fail 1; fi
+}
+
+# Creates dir by specified path
 function create_dir {
 
     debug "create_dir param: $1"
@@ -101,8 +111,6 @@ function create_dir {
         then
             message "Directory $1 already exists."
         else
-            message "Creating $1 "
-
             if mkdir "$1" &> /dev/null
                 then
                     message "Created $1"
@@ -114,17 +122,13 @@ function create_dir {
     fi
 }
 
-function prepare_path {
-    echo $1
-}
-
+##################
+#   Main logic   #
 ##################
 
+if [[ $# -eq 0 ]]; then help; fi;
 
-target_path="/home/$USER/Music"
-
-
-while getopts "b:a:y:" optname
+while getopts "b:a:y:vh" optname
 do
     case "$optname" in
         b)
@@ -136,33 +140,40 @@ do
         y)
             year=$OPTARG
             ;;
-        [?])
-            echo "Invalid option "$optname"\n"
+        v)
+            verbose=1
+            ;;
+        h)
+            help
+            ;;
+        *)
             fail 1
     esac
 done
 
 shift $(($OPTIND - 1))
 
-archive=${!#}
 
-debug "Band:\"$band\", album:\"$album\", year:\"$year\", archive:\"$archive\""
+args=$#
+archive=${!args}
+
+debug "Band:\"$band\"" 
+debug "Album:\"$album\""
+debug "Year:\"$year\""
+debug "Archive:\"$archive\""
+debug "Verbose: \"$verbose\""
 
 # Input validation
 validate "$band" "$album" "$year" "$archive" ${#}
 
-# Starting work
-#printf "Processing %s with album %s\n" $band $album
+create_dir "$target_path/$band"
 
-# Create band dir
-create_dir "$(prepare_path "$target_path/$band")"
-
-#Generate album path
-if [ "" != "$year" ]
+# Generate album path
+if [[ '' != "$year" ]]
     then
-        album_path="$(prepare_path "$target_path/$band/$year - $album")"
+        album_path="$target_path/$band/$year - $album"
     else
-        album_path="$(prepare_path "$target_path/$band/$album")"
+        album_path="$target_path/$band/$album"
 fi
 
 create_dir "$album_path"
@@ -175,6 +186,10 @@ case "$archive" in
     *.zip)
         message "Extracting ZIP archive..."
         unzip -j "$archive" -d "$album_path";
+    ;;
+    *.7z)
+        message "Extracting 7z archive..."
+        7z e -o"$album_path" "$archive"
     ;;
     *)
         error "Unsupported extension..."
