@@ -5,8 +5,14 @@
 # variable keeps steps to be done in case of fail (kinda transaction state)
 declare -a steps
 
-# Where to put unpacked stuff
-target_path="/home/$USER/Music"
+CONFIG_FILE_PATH="$HOME/.settle_album"
+
+# Default settings
+DEFAULT_TARGET_PATH="$HOME/Music"
+DEFAULT_TEMPLATE="%b/%y - %a"
+DEFAULT_TEMPLATE_WITHOUT_YEAR="%b/%a"
+DEFAULT_DELETE_AFTER_UNPACK=1
+
 
 # Stores action for performing in case of rollback
 function addRevertStep {
@@ -53,7 +59,11 @@ function debug {
 }
 
 function success {
-    rm -f "$archive"
+    if [[ $delete_after_unpack -eq 1 ]]
+        then
+            message "Deleting source archive."
+            rm -f "$archive"
+    fi
     message "SUCEEDED TO UNPACK ARCHIVE"
     exit 0
 }
@@ -89,7 +99,7 @@ function help {
 # Validates input
 function validate {
 
-    if [ ! -d "$target_path" ]; then error "Path \"$target_path\" does not exist"; error "Create it first"; fail 1; fi
+    if [ ! -d "$target_path" ]; then error "Path \"$target_path\" does not exist"; error "Create it first or define another in config file"; fail 1; fi
 
     if [ "$5"  = "0" ]; then error "What to unpack?"; error "Last argument should be path to archive."; fail 1; fi
 
@@ -103,23 +113,72 @@ function validate {
 }
 
 # Creates dir by specified path
-function create_dir {
+function createDir {
 
-    debug "create_dir param: $1"
+    debug "createDir param: $1"
 
     if [ -d "$1" ]
         then
-            message "Directory $1 already exists."
+            error "Directory \"$1\" already exists."
+            fail 1
         else
-            if mkdir "$1" &> /dev/null
+            if mkdir -p "$1" &> /dev/null
                 then
-                    message "Created $1"
+                    message "Created \"$1\""
                     addRevertStep "rm -rf \"$1\""
                 else
-                    error "Can not create $1"
+                    error "Can not create \"$1\""
                     fail 1
             fi
     fi
+}
+
+# Define settings not specified in config file
+function processSettings {
+
+    if [[ ! $target_path ]]; then target_path="$HOME/Music"; debug "Setting default target_path"; fi
+
+    if [[ ! $template ]]; then template=$DEFAULT_TEMPLATE; debug "Setting default template"; fi
+
+    if [[ ! $template_without_year ]]
+        then template_without_year=$DEFAULT_TEMPLATE_WITHOUT_YEAR
+        debug "Setting default template_without_year"
+    fi
+
+    if [[ ! $delete_after_unpack ]]
+        then delete_after_unpack=$DEFAULT_DELETE_AFTER_UNPACK
+        debug "Setting default delete_after_unpack"
+    fi
+
+}
+
+function dumpDebugSettings {
+    debug " -- Options --"
+    debug "Band:\"$band\""
+    debug "Album:\"$album\""
+    debug "Year:\"$year\""
+    debug "Archive:\"$archive\""
+    debug "Verbose: \"$verbose\""
+    debug " -- Settings --"
+    debug "Target path: \"$target_path\""
+    debug "Template: \"$template\""
+    debug "Template without year: \"$template_without_year\""
+    debug "Delete after unpack: \"$delete_after_unpack\""
+}
+
+function getRelativeAlbumPath {
+    local path
+
+    if [[ ! $3 ]]
+        then
+            path="$template_without_year"
+        else
+            path=`echo "$template" | sed -e "s/%y/$3/"`
+    fi
+
+    path=`echo "$path" | sed -e "s/%b/$1/" | sed -e "s/%a/$2/"`
+
+    echo $path
 }
 
 ##################
@@ -157,39 +216,44 @@ shift $(($OPTIND - 1))
 args=$#
 archive=${!args}
 
-debug "Band:\"$band\"" 
-debug "Album:\"$album\""
-debug "Year:\"$year\""
-debug "Archive:\"$archive\""
-debug "Verbose: \"$verbose\""
+# Load external settings if any
+if [[ -f $CONFIG_FILE_PATH ]]
+    then
+        debug "Including external settings from \"$CONFIG_FILE_PATH\""
+        . $CONFIG_FILE_PATH
+    else
+        debug "Can not fount external settings file... Starting with defaults."
+fi
+
+processSettings
+
+# Show debug info (if needed)
+dumpDebugSettings
 
 # Input validation
 validate "$band" "$album" "$year" "$archive" ${#}
 
-create_dir "$target_path/$band"
+relPath=`getRelativeAlbumPath "$band" "$album" "$year"`
+absPath="$target_path/$relPath"
+
+debug "Album will be unpacked to \"$absPath\""
+
+createDir "$absPath"
 
 # Generate album path
-if [[ '' != "$year" ]]
-    then
-        album_path="$target_path/$band/$year - $album"
-    else
-        album_path="$target_path/$band/$album"
-fi
-
-create_dir "$album_path"
 
 case "$archive" in
     *.rar)
         message "Extracting RAR archive..."
-        unrar e -ep "$archive" "$album_path";
+        unrar e -ep "$archive" "$absPath";
     ;;
     *.zip)
         message "Extracting ZIP archive..."
-        unzip -j "$archive" -d "$album_path";
+        unzip -j "$archive" -d "$absPath";
     ;;
     *.7z)
         message "Extracting 7z archive..."
-        7z e -o"$album_path" "$archive"
+        7z e -o"$absPath" "$archive"
     ;;
     *)
         error "Unsupported extension..."
