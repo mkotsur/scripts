@@ -126,7 +126,7 @@ function validate {
 
     if [ ! -f "$4" ]; then error "Archive $4 does not exists."; fail 1; fi
 
-    if [[ ! "$4" =~ ^.*\.(zip|rar|7z) ]]; then error "Unsupported type of archive."; fail 1; fi
+    if [[ ! "$4" =~ ^.*\.(zip|ZIP|rar|RAR|7z) ]]; then error "Unsupported type of archive."; fail 1; fi
 
     if [ "$1" == "" ]; then error "Band name missing."; fail 1; fi
 
@@ -263,11 +263,11 @@ debug "Album will be unpacked to \"$absPath\""
 createDir "$absPath"
 
 case "$archive" in
-    *.rar)
+    *.rar | *.RAR)
         message "Extracting RAR archive..."
         unrar e -ep "$archive" "$absPath";
     ;;
-    *.zip)
+    *.zip | *.ZIP)
         message "Extracting ZIP archive..."
         unzip -j "$archive" -d "$absPath";
     ;;
@@ -283,4 +283,5 @@ esac
 
 # Handle unpacking result
 if [[ $? ]] ; then success; else fail 1; fi
+
 
