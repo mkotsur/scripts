@@ -30,7 +30,7 @@ function doRevertSteps {
     while [ $cmd_index -ge 0 ]
         do
         cmd=${steps[$cmd_index]}
-        echo " ** Command $cmd_index of $cmd_count: " $cmd
+        message " ** Command $cmd_index of $cmd_count: " $cmd
                    
 
         if eval $cmd &> /dev/null
@@ -74,24 +74,45 @@ function fail  {
     exit $1
 }
 
-function help {
+function printHelp {
 
     echo "Script for extracting music from archives..."
     echo " -- Options --"
-    echo "-b [required] Band name"
-    echo "-a [required] Album name"
-    echo "-y [optional] release Year"
+    echo -e "   \033[1m-b\033[0m [required] Band name"
+    echo -e "   \033[1m-a\033[0m [required] Album name"
+    echo -e "   \033[1m-y\033[0m [optional] release Year"
     echo ""
     echo " -- Keys --"
-    echo "-v [optional] Verbose"
+    echo -e "   \033[1m-v\033[0m [optional] Verbose"
+    echo ""
+    echo " -- Settings --"
+    echo -e "Could be defined in config file located at \033[1m~/.settle_album\033[0m"
+    echo "Example given below."
+    echo ''
+    echo -e "   \033[1mtarget_path\033[0m : Path to the music collection. Default: \"$DEFAULT_TARGET_PATH\";"
+    echo -e "   \033[1mtemplate\033[0m : Template of path inside \"target_path\" where unpacked files will be located if year specified. Default: \"$DEFAULT_TEMPLATE\";"
+    echo -e "   \033[1mtemplate_without_year\033[0m : Template of path when year not specified. Default: \"$DEFAULT_TEMPLATE_WITHOUT_YEAR\";"
+    echo -e "   \033[1mdelete_after_unpack\033[0m : Delete source archive after successful unpacking - 1 or 0. Default: \"$DEFAULT_DELETE_AFTER_UNPACK\"."
     echo ""
     echo " -- Usage --"
-    echo "./settle_album.sh -b \"Band name\" -a \"Album name\" -y YYYY ~/Downloads/music_archive.rar"
+    echo -e "   \033[1m./settle_album.sh -b\033[0m \"Band name\" \033[1m-a\033[0m \"Album name\" \033[1m-y\033[0m YYYY \033[1m~/Downloads/music_archive.rar\033[0m"
     echo ""
-    echo "Currently supported types: zip, rar, 7z. Files will be extracted to $target_path/Band name/YYYY - Album name/*;"
+    echo "Currently supported types: zip, rar, 7z. If there is no config file with another settings, files will be unpacked to $DEFAULT_TARGET_PATH/$DEFAULT_TEMPLATE/*."
     echo "Directory structure inside archive will be suppressed."
-    echo "Script provided as is. Author: Mykhailo Kotsur. http://sotomajor.org.ua"
-    echo "You are welcome to suggest or contribute: http://github.com/mkotsur/scripts"
+    echo ""
+    echo " -- Config file example --"
+    echo 'mkotsur@n-fox:~$ cat ~/.settle_album'
+    echo ''
+    echo '  target_path="/home/mkotsur/Music/"'
+    echo '  template="%b/%y-%a"'
+    echo '  template_without_year="%b/%a"'
+    echo '  delete_after_unpack=0'
+
+    echo ''
+    echo ' -- About --'
+    echo 'Script provided as is.'
+    echo 'Author: Mykhailo Kotsur. http://sotomajor.org.ua'
+    echo 'You are welcome to suggest or contribute: http://github.com/mkotsur/scripts'
     exit 0
 
 }
@@ -185,7 +206,7 @@ function getRelativeAlbumPath {
 #   Main logic   #
 ##################
 
-if [[ $# -eq 0 ]]; then help; fi;
+if [[ $# -eq 0 ]]; then printHelp; fi;
 
 while getopts "b:a:y:vh" optname
 do
@@ -203,7 +224,7 @@ do
             verbose=1
             ;;
         h)
-            help
+            printHelp
             ;;
         *)
             fail 1
@@ -211,7 +232,6 @@ do
 done
 
 shift $(($OPTIND - 1))
-
 
 args=$#
 archive=${!args}
@@ -225,6 +245,7 @@ if [[ -f $CONFIG_FILE_PATH ]]
         debug "Can not fount external settings file... Starting with defaults."
 fi
 
+# Override default settings if defined in config file
 processSettings
 
 # Show debug info (if needed)
@@ -233,14 +254,13 @@ dumpDebugSettings
 # Input validation
 validate "$band" "$album" "$year" "$archive" ${#}
 
+# Generate album path
 relPath=`getRelativeAlbumPath "$band" "$album" "$year"`
 absPath="$target_path/$relPath"
 
 debug "Album will be unpacked to \"$absPath\""
 
 createDir "$absPath"
-
-# Generate album path
 
 case "$archive" in
     *.rar)
@@ -262,5 +282,5 @@ case "$archive" in
 esac
 
 # Handle unpacking result
-if [ $? = 0 ] ; then success; else fail 1; fi
+if [[ $? ]] ; then success; else fail 1; fi
 
