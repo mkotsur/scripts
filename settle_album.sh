@@ -12,7 +12,7 @@ DEFAULT_TARGET_PATH="$HOME/Music"
 DEFAULT_TEMPLATE="%b/%y - %a"
 DEFAULT_TEMPLATE_WITHOUT_YEAR="%b/%a"
 DEFAULT_DELETE_AFTER_UNPACK=1
-
+DEFAULT_PROCESS_TAGS=1
 
 # Stores action for performing in case of rollback
 function addRevertStep {
@@ -171,6 +171,11 @@ function processSettings {
         debug "Setting default delete_after_unpack"
     fi
 
+    if [[ ! $process_tags ]]
+    	then process_tags=$DEFAULT_PROCESS_TAGS
+	    debug "Setting default process_tags"
+    fi
+
 }
 
 function dumpDebugSettings {
@@ -280,6 +285,11 @@ case "$archive" in
         fail 1
     ;;
 esac
+
+if [[ $process_tags -eq 1 ]]
+   then
+	find "$absPath"  -iname '*.mp3' -print0 | xargs -0 mid3iconv -eCP1251 --remove-v1
+fi
 
 # Handle unpacking result
 if [[ $? ]] ; then success; else fail 1; fi
