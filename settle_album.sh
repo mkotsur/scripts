@@ -93,6 +93,7 @@ function printHelp {
     echo -e "   \033[1mtemplate\033[0m : Template of path inside \"target_path\" where unpacked files will be located if year specified. Default: \"$DEFAULT_TEMPLATE\";"
     echo -e "   \033[1mtemplate_without_year\033[0m : Template of path when year not specified. Default: \"$DEFAULT_TEMPLATE_WITHOUT_YEAR\";"
     echo -e "   \033[1mdelete_after_unpack\033[0m : Delete source archive after successful unpacking - 1 or 0. Default: \"$DEFAULT_DELETE_AFTER_UNPACK\"."
+    echo -e "   \033[1mprocess_tags\033[0m : Convert tags into UTF-8 - 1 or 0. Default: \"$DEFAULT_DELETE_AFTER_UNPACK\"."
     echo ""
     echo " -- Usage --"
     echo -e "   \033[1m./settle_album.sh -b\033[0m \"Band name\" \033[1m-a\033[0m \"Album name\" \033[1m-y\033[0m YYYY \033[1m~/Downloads/music_archive.rar\033[0m"
@@ -107,6 +108,7 @@ function printHelp {
     echo '  template="%b/%y-%a"'
     echo '  template_without_year="%b/%a"'
     echo '  delete_after_unpack=0'
+    echo '  process_tags=0'
 
     echo ''
     echo ' -- About --'
