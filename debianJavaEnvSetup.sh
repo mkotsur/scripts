@@ -4,6 +4,7 @@ USERNAME=`hostname`
 
 if [ ! -d "/home/${USERNAME}" ]; then
   useradd ${USERNAME} -s /bin/bash
+  #This will not work if password contains dash
   echo "${USERNAME}:${USERNAME}" > chpasswd
   mkdir "/home/${USERNAME}"
   chown ${USERNAME}:${USERNAME} /home/${USERNAME}
@@ -26,19 +27,18 @@ export LC_ALL=en_US.UTF-8
 locale-gen en_US.UTF-8
 # dpkg-reconfigure locales
 
-su ${USERNAME}
-
 cd /tmp && wget http://apache.mirror.easycolocate.nl/maven/binaries/apache-maven-3.0.4-bin.tar.gz && tar -xvzf apache-maven-3.0.4-bin.tar.gz && sudo mv apache-maven-3.0.4 /usr/local/lib && sudo ln -s /usr/local/lib/apache-maven-3.0.4/bin/mvn /usr/local/bin/
 
 # add to /etc/bash.bashrc
 
-sudo bash -c "echo export JAVA_HOME=/usr/lib/jvm/java-6-sun > /home/${USERNAME}/.bashrc"
-sudo bash -c 'echo "NameVirtualHost *.80" > /etc/apache2/httpd.conf'
+bash -c "echo export JAVA_HOME=/usr/lib/jvm/java-6-sun > /home/${USERNAME}/.bashrc"
+bash -c 'echo "NameVirtualHost *.80" > /etc/apache2/httpd.conf'
+chown ${USERNAME}:${USERNAME} "/home/${USERNAME}/.bashrc"
 
-sudo chown -R tomcat6:tomcat6 /etc/tomcat6
+chown -R tomcat6:tomcat6 /etc/tomcat6
 
-sudo a2enmod proxy_http
-sudo a2enmod rewrite
-sudo apache2ctl restart
+a2enmod proxy_http
+a2enmod rewrite
+apache2ctl restart
 
 echo "Now execute as local user: ssh-copy-id -i ~/.ssh/id_dsa.pub ${USERNAME}@${USERNAME}.ams.intranet"
