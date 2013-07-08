@@ -1,0 +1,12 @@
+#!/bin/bash
+FOUND=0
+CURR_PATH="$PWD"
+REAL_GRADLEW=
+if [ -x "$CURR_PATH/gradlew" ]
+then
+  echo " -- Using gradle wrapper... --"
+  "$CURR_PATH/gradlew" "$@"
+else
+  echo " -- Using plain gradle... --"
+  gradle "$@"
+fi
